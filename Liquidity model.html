@@ -1,0 +1,491 @@
+# Evergreen---Liquidity-Engine
+A self-contained, interactive model of the core trade-off inside open-ended private-markets funds — built to illustrate the problem set the platform management teams at firms like Goldman Sachs XIG are actively solving as they scale evergreen vehicles to individual investors.[evergreen-liquidity-engine.html](https://github.com/user-attachments/files/29146045/evergreen-liquidity-engine.html)
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Evergreen Liquidity Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF9F4; --ink:#15202B; --muted:#5E6872; --faint:#8C949C;
+    --line:#E4DED3; --line2:#EFEAE0;
+    --cost:#C2683C;   /* cash drag — the cost of holding liquidity */
+    --liq:#2E6B6B;    /* liquidity coverage — the safety */
+    --spot:#16414E;   /* the efficient band */
+    --warn:#A8421F;
+    --card:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif; line-height:1.5;
+    -webkit-font-smoothing:antialiased; padding:0 0 80px;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:0 28px}
+  @media(max-width:640px){.wrap{padding:0 18px}}
+
+  /* ---- masthead ---- */
+  header{border-bottom:1.5px solid var(--ink);padding:34px 0 18px;margin-bottom:34px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--cost);font-weight:500;margin-bottom:18px;display:flex;
+    gap:10px;align-items:center;flex-wrap:wrap}
+  .eyebrow .dot{width:6px;height:6px;background:var(--cost);border-radius:50%}
+  .eyebrow .sep{color:var(--line);font-weight:400}
+  .eyebrow .ctx{color:var(--muted)}
+  h1{font-family:"Fraunces",serif;font-weight:500;font-size:clamp(31px,5.4vw,52px);
+    line-height:1.04;letter-spacing:-.015em;max-width:16ch}
+  h1 em{font-style:italic;color:var(--cost)}
+  .dek{font-size:16.5px;color:var(--muted);max-width:60ch;margin-top:18px;line-height:1.5}
+  .dek b{color:var(--ink);font-weight:600}
+
+  /* ---- section scaffolding ---- */
+  .sec-label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);font-weight:500;
+    display:flex;align-items:center;gap:12px;margin:48px 0 20px}
+  .sec-label .ln{flex:1;height:1px;background:var(--line)}
+
+  /* ---- console grid ---- */
+  .console{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:860px){.console{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:24px 24px 26px}
+  .panel h3{font-family:"Fraunces",serif;font-weight:500;font-size:19px;margin-bottom:4px}
+  .panel .sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+
+  /* sliders */
+  .ctrl{margin-bottom:22px}
+  .ctrl:last-child{margin-bottom:0}
+  .ctrl .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+  .ctrl label{font-size:13.5px;font-weight:500}
+  .ctrl .val{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500;color:var(--spot)}
+  .ctrl.primary .val{font-size:20px}
+  .ctrl .hint{font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.45}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;
+    background:var(--line);border-radius:3px;outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;
+    border-radius:50%;background:var(--paper);border:2px solid var(--spot);cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .1s}
+  input[type=range]::-webkit-slider-thumb:active{transform:scale(1.15)}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
+    background:var(--paper);border:2px solid var(--spot);cursor:pointer}
+  .ctrl.primary input[type=range]{height:5px}
+  .ctrl.primary input[type=range]::-webkit-slider-thumb{width:24px;height:24px;border-color:var(--cost)}
+
+  /* KPI readout */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .kpi{background:var(--card);padding:18px 18px 16px}
+  .kpi .k-label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  .kpi .k-val{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;line-height:1}
+  .kpi .k-unit{font-size:13px;color:var(--muted);font-weight:400}
+  .kpi .k-foot{font-size:11.5px;color:var(--muted);margin-top:7px}
+  #k-drag .k-val{color:var(--cost)}
+  #k-gate .k-val{color:var(--ink)}
+  #k-lcr .k-val{color:var(--liq)}
+
+  /* charts */
+  .chart-card{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:24px}
+  .chart-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;
+    flex-wrap:wrap;gap:8px}
+  .chart-head h3{font-family:"Fraunces",serif;font-weight:500;font-size:19px}
+  .chart-head .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);
+    font-family:"IBM Plex Mono",monospace}
+  .chart-head .legend span{display:flex;align-items:center;gap:6px}
+  .chart-head .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .chart-sub{font-size:13px;color:var(--muted);margin-bottom:18px;max-width:64ch}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .ax-txt{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--faint)}
+  .ax-title{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--muted);
+    letter-spacing:.06em;text-transform:uppercase}
+  .grid-ln{stroke:var(--line2);stroke-width:1}
+
+  /* ---- did you know card ---- */
+  .fact-card{border:1px solid var(--line);border-radius:3px;padding:26px 28px 22px;
+    margin-top:20px;background:var(--card);position:relative}
+  .fact-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--liq);font-weight:500;margin-bottom:14px;
+    display:flex;align-items:center;gap:10px}
+  .fact-icon{font-size:9px;opacity:.7}
+  .fact-next{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.06em;color:var(--muted);background:none;border:1px solid var(--line);
+    border-radius:3px;padding:4px 10px;cursor:pointer;transition:border-color .15s,color .15s}
+  .fact-next:hover{border-color:var(--liq);color:var(--liq)}
+  .fact-text{font-size:15px;line-height:1.65;color:var(--ink);max-width:74ch;min-height:3.5em}
+  .fact-text b{color:var(--liq);font-weight:600}
+  .fact-text em{color:var(--cost);font-style:normal;font-weight:500}
+  .fact-dots{display:flex;gap:6px;margin-top:16px}
+  .fact-dots span{width:6px;height:6px;border-radius:50%;background:var(--line);
+    transition:background .2s;cursor:pointer}
+  .fact-dots span.active{background:var(--liq)}
+
+  footer{margin-top:48px;padding-top:22px;border-top:1px solid var(--line);
+    font-size:12.5px;color:var(--faint);line-height:1.6}
+  footer b{color:var(--muted);font-weight:600}
+  .by{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin-top:10px}
+  .skills{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+  .skills span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
+    border:1px solid var(--line);border-radius:3px;padding:4px 9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">
+      <span class="dot"></span> Private Markets · Liquidity Modeling
+      <span class="sep">/</span>
+      <span class="ctx">Built for the XIG Platform Management problem set</span>
+    </div>
+    <h1>Bringing private markets to everyone created a <em>liquidity problem</em> nobody had to solve before.</h1>
+    <p class="dek">Evergreen and semi-liquid funds promise individual investors something private assets were never built to give: <b>the ability to leave on a quarterly basis.</b> Hold too much cash to honor that promise and you bleed returns to drag. Hold too little and you gate redemptions in a stress quarter. This tool models the trade-off the platform team lives in — and finds the band that keeps both in check.</p>
+  </header>
+
+  <!-- CONSOLE -->
+  <div class="sec-label">01 — The control room <span class="ln"></span></div>
+  <div class="console">
+
+    <div class="panel">
+      <h3>Fund assumptions</h3>
+      <div class="sub">A single evergreen sleeve. Move the inputs; everything recomputes live.</div>
+
+      <div class="ctrl primary">
+        <div class="row"><label for="s-sleeve">Liquidity sleeve <span style="color:var(--faint);font-weight:400">(cash &amp; liquid assets)</span></label><span class="val" id="v-sleeve">10%</span></div>
+        <input type="range" id="s-sleeve" min="2" max="30" step="1" value="10">
+        <div class="hint">The share of NAV parked in liquid instruments so redeeming investors can be paid without selling private assets at a discount.</div>
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label for="s-redeem">Expected net redemptions / quarter</label><span class="val" id="v-redeem">1.5%</span></div>
+        <input type="range" id="s-redeem" min="0" max="5" step="0.5" value="1.5">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label for="s-vol">Redemption volatility (stress)</label><span class="val" id="v-vol">2.0%</span></div>
+        <input type="range" id="s-vol" min="0.5" max="4" step="0.5" value="2">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label for="s-ill">Net return on private book</label><span class="val" id="v-ill">12%</span></div>
+        <input type="range" id="s-ill" min="6" max="18" step="0.5" value="12">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label for="s-liq">Yield on liquidity sleeve</label><span class="val" id="v-liq">4.3%</span></div>
+        <input type="range" id="s-liq" min="0" max="6" step="0.1" value="4.3">
+      </div>
+    </div>
+
+    <div class="panel" style="padding-bottom:24px">
+      <h3>Live readout</h3>
+      <div class="sub">3,000-path Monte Carlo over 12 quarters, recomputed on every change.</div>
+      <div class="kpis">
+        <div class="kpi" id="k-drag">
+          <div class="k-label">Cash Drag</div>
+          <div class="k-val"><span id="o-drag">77</span> <span class="k-unit">bps / yr</span></div>
+          <div class="k-foot">Return surrendered to the sleeve</div>
+        </div>
+        <div class="kpi" id="k-gate">
+          <div class="k-label">Gating Probability</div>
+          <div class="k-val"><span id="o-gate">6.0</span><span class="k-unit">% / qtr</span></div>
+          <div class="k-foot">Quarters a redemption can't be fully met</div>
+        </div>
+        <div class="kpi" id="k-lcr">
+          <div class="k-label">Min. Coverage</div>
+          <div class="k-val"><span id="o-lcr">1.18</span><span class="k-unit">×</span></div>
+          <div class="k-foot">Worst-case sleeve ÷ capped redemption</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Sleeve, year-3</div>
+          <div class="k-val"><span id="o-end">10</span><span class="k-unit">%</span></div>
+          <div class="k-foot">Avg. ending liquid share</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FRONTIER -->
+  <div class="sec-label">02 — The trade-off, drawn <span class="ln"></span></div>
+  <div class="chart-card">
+    <div class="chart-head">
+      <h3>The liquidity frontier</h3>
+      <div class="legend">
+        <span><i style="background:var(--spot)"></i> Sleeve sweep</span>
+        <span><i style="background:var(--cost)"></i> Your fund</span>
+        <span><i style="background:var(--liq)"></i> Efficient band</span>
+      </div>
+    </div>
+    <div class="chart-sub">Every point is a candidate sleeve size from 2% to 30%. Down-and-right is cheaper but riskier; up-and-left is safer but bleeds return. The green band is where gating stays under 3% per quarter at the lowest possible drag — the answer the platform team actually has to defend.</div>
+    <svg id="frontier" viewBox="0 0 760 360" role="img" aria-label="Cash drag versus gating probability frontier"></svg>
+  </div>
+
+  <!-- FAN CHART -->
+  <div class="chart-card" style="margin-top:20px">
+    <div class="chart-head">
+      <h3>Where the sleeve actually goes</h3>
+      <div class="legend">
+        <span><i style="background:var(--liq)"></i> Median path</span>
+        <span><i style="background:#B9D2D2"></i> 10–90% range</span>
+      </div>
+    </div>
+    <div class="chart-sub">Simulated liquid-sleeve level across 12 quarters at your current settings. When the shaded cone dips toward the floor, those are the quarters where redemptions outrun the cash on hand.</div>
+    <svg id="fan" viewBox="0 0 760 300" role="img" aria-label="Monte Carlo fan chart of the liquidity sleeve over time"></svg>
+  </div>
+
+  <!-- DID YOU KNOW -->
+  <div class="fact-card">
+    <div class="fact-eyebrow">
+      <span class="fact-icon">◆</span> Did you know?
+      <button class="fact-next" id="fact-next" aria-label="Next fact">Next →</button>
+    </div>
+    <p class="fact-text" id="fact-text"></p>
+    <div class="fact-dots" id="fact-dots"></div>
+  </div>
+
+  <footer>
+    <b>What this is.</b> A self-contained working model of the core tension inside open-ended private-markets funds — the same trade-off XIG's Private Markets Platform Management team manages as Goldman scales its evergreen G-Series across credit, infrastructure, and secondaries to individual investors. Figures are illustrative, generated by a Monte Carlo engine in the browser; no proprietary or client data is used.
+    <div class="skills">
+      <span>Advanced financial modeling</span><span>Monte Carlo simulation</span><span>Liquidity &amp; cash-flow analysis</span><span>Risk framework (LCR / gating)</span><span>Data visualization</span>
+    </div>
+    <div class="by">Built by Allen Nelson · liquidity-engine demo · 2026</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const qFromA=a=>Math.pow(1+a,0.25)-1;
+  function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+  const REDEMP_CAP=0.05; // 5% of NAV honored per quarter — standard semi-liquid gate
+  const QUARTERS=12;
+
+  // ---- core engine: returns paths + stats ----
+  function simulate(p,paths,keepPaths){
+    const qIll=qFromA(p.ill),qLiq=qFromA(p.liq),qDist=qFromA(0.05);
+    let gateQ=0,totQ=0,minLCRsum=0,endSum=0;
+    const pathStore=keepPaths?[]:null;
+    for(let i=0;i<paths;i++){
+      let sleeve=p.sleeve*100, illiq=100-sleeve, minLCR=99;
+      const series=keepPaths?[sleeve]:null;
+      for(let q=0;q<QUARTERS;q++){
+        const dist=illiq*qDist;
+        illiq=illiq*(1+qIll)-dist; sleeve=sleeve*(1+qLiq)+dist;
+        const nav=sleeve+illiq;
+        let net=p.redeem+p.vol*randn();
+        if(net<0){ sleeve+=(-net)*nav; }
+        else{
+          const honored=Math.min(net,REDEMP_CAP)*nav;
+          const lcr=sleeve/(honored||1e-9); if(lcr<minLCR)minLCR=lcr;
+          if(honored>sleeve){ gateQ++; sleeve=0; } else sleeve-=honored;
+        }
+        const tgt=p.sleeve*(sleeve+illiq);
+        if(sleeve>tgt){ const m=sleeve-tgt; sleeve-=m; illiq+=m; }
+        totQ++;
+        if(keepPaths) series.push(sleeve/(sleeve+illiq)*100);
+      }
+      if(minLCR===99)minLCR=5;
+      minLCRsum+=minLCR; endSum+=sleeve/(sleeve+illiq);
+      if(keepPaths)pathStore.push(series);
+    }
+    return { gateProb:gateQ/totQ, minLCR:minLCRsum/paths,
+      endSleeve:endSum/paths, paths:pathStore };
+  }
+  const dragBps=p=>p.sleeve*(p.ill-p.liq)*10000;
+
+  // ---- read inputs ----
+  function readParams(){
+    return {
+      sleeve:+$("s-sleeve").value/100,
+      redeem:+$("s-redeem").value/100,
+      vol:+$("s-vol").value/100,
+      ill:+$("s-ill").value/100,
+      liq:+$("s-liq").value/100
+    };
+  }
+
+  // ===== FRONTIER CHART =====
+  const F={w:760,h:360,l:64,r:24,t:18,b:54};
+  function buildFrontier(p){
+    const svg=$("frontier"); svg.innerHTML="";
+    const pts=[];
+    for(let s=2;s<=30;s+=1){
+      const pp={...p,sleeve:s/100};
+      const r=simulate(pp,1200,false);
+      pts.push({s, drag:dragBps(pp), gate:r.gateProb*100, lcr:r.minLCR});
+    }
+    const maxDrag=Math.max(...pts.map(d=>d.drag))*1.05;
+    const maxGate=Math.max(...pts.map(d=>d.gate))*1.08;
+    const px=d=>F.l+(d/maxDrag)*(F.w-F.l-F.r);
+    const py=g=>F.t+(1-g/maxGate)*(F.h-F.t-F.b);
+    const NS="http://www.w3.org/2000/svg";
+    const add=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e;};
+
+    // gridlines + y axis (gating %)
+    for(let g=0;g<=maxGate;g+=Math.ceil(maxGate/5/2)*2||5){
+      add("line",{x1:F.l,y1:py(g),x2:F.w-F.r,y2:py(g),class:"grid-ln"});
+      const t=add("text",{x:F.l-10,y:py(g)+3.5,class:"ax-txt","text-anchor":"end"});t.textContent=g+"%";
+    }
+    // x ticks (drag bps)
+    for(let d=0;d<=maxDrag;d+=50){
+      const t=add("text",{x:px(d),y:F.h-F.b+20,class:"ax-txt","text-anchor":"middle"});t.textContent=d;
+    }
+    // axis titles
+    const xt=add("text",{x:(F.l+F.w-F.r)/2,y:F.h-6,class:"ax-title","text-anchor":"middle"});
+    xt.textContent="Cash drag  (bps / yr)  →  cost of safety";
+    const yt=add("text",{x:16,y:(F.t+F.h-F.b)/2,class:"ax-title","text-anchor":"middle",
+      transform:`rotate(-90 16 ${(F.t+F.h-F.b)/2})`});
+    yt.textContent="Gating probability  (% / qtr)";
+
+    // efficient band: contiguous sleeves with gate<=3 — shade their x-range
+    const eff=pts.filter(d=>d.gate<=3);
+    if(eff.length){
+      const x0=px(Math.min(...eff.map(d=>d.drag)));
+      const x1=px(Math.max(...eff.map(d=>d.drag)));
+      add("rect",{x:Math.min(x0,x1),y:F.t,width:Math.abs(x1-x0)||2,
+        height:F.h-F.t-F.b,fill:"var(--liq)","fill-opacity":"0.08"});
+      const lab=add("text",{x:(x0+x1)/2,y:F.t+14,class:"ax-txt","text-anchor":"middle",
+        fill:"var(--liq)"});lab.textContent="efficient band";
+    }
+    // 3% reference line
+    add("line",{x1:F.l,y1:py(3),x2:F.w-F.r,y2:py(3),stroke:"var(--liq)",
+      "stroke-width":1,"stroke-dasharray":"4 4","stroke-opacity":".5"});
+
+    // curve
+    let path="";
+    pts.forEach((d,i)=>{ path+=(i?"L":"M")+px(d.drag)+" "+py(d.gate);});
+    add("path",{d:path,fill:"none",stroke:"var(--spot)","stroke-width":2,"stroke-opacity":".85"});
+    // dots
+    pts.forEach(d=>{ add("circle",{cx:px(d.drag),cy:py(d.gate),r:2.6,
+      fill:"var(--paper)",stroke:"var(--spot)","stroke-width":1.4}); });
+
+    // current fund marker
+    const cur=pts.reduce((a,b)=>Math.abs(b.s-p.sleeve*100)<Math.abs(a.s-p.sleeve*100)?b:a);
+    const cx=px(cur.drag),cy=py(cur.gate);
+    add("line",{x1:cx,y1:cy,x2:cx,y2:F.h-F.b,stroke:"var(--cost)","stroke-width":1,"stroke-dasharray":"3 3","stroke-opacity":".5"});
+    add("circle",{cx,cy,r:7,fill:"var(--cost)","fill-opacity":".18"});
+    add("circle",{cx,cy,r:4.5,fill:"var(--cost)"});
+    const tag=add("text",{x:cx,y:cy-13,class:"ax-txt","text-anchor":"middle",
+      fill:"var(--cost)","font-weight":"600"});tag.textContent="you · "+cur.s+"% sleeve";
+
+    return {pts,eff};
+  }
+
+  // ===== FAN CHART =====
+  const G={w:760,h:300,l:50,r:20,t:14,b:38};
+  function buildFan(p){
+    const svg=$("fan"); svg.innerHTML="";
+    const sim=simulate(p,800,true);
+    const paths=sim.paths;
+    const NS="http://www.w3.org/2000/svg";
+    const add=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e;};
+    const n=QUARTERS+1;
+    // per-quarter percentiles
+    const p10=[],p50=[],p90=[];
+    for(let q=0;q<n;q++){
+      const col=paths.map(pa=>pa[q]).sort((a,b)=>a-b);
+      p10.push(col[Math.floor(col.length*0.10)]);
+      p50.push(col[Math.floor(col.length*0.50)]);
+      p90.push(col[Math.floor(col.length*0.90)]);
+    }
+    const maxY=Math.max(...p90)*1.1, minY=0;
+    const px=q=>G.l+(q/(n-1))*(G.w-G.l-G.r);
+    const py=v=>G.t+(1-(v-minY)/(maxY-minY))*(G.h-G.t-G.b);
+
+    // gridlines
+    for(let v=0;v<=maxY;v+=Math.ceil(maxY/4/5)*5||5){
+      add("line",{x1:G.l,y1:py(v),x2:G.w-G.r,y2:py(v),class:"grid-ln"});
+      const t=add("text",{x:G.l-9,y:py(v)+3.5,class:"ax-txt","text-anchor":"end"});t.textContent=v+"%";
+    }
+    for(let q=0;q<n;q+=2){
+      const t=add("text",{x:px(q),y:G.h-G.b+18,class:"ax-txt","text-anchor":"middle"});t.textContent="Q"+q;
+    }
+    const xt=add("text",{x:(G.l+G.w-G.r)/2,y:G.h-4,class:"ax-title","text-anchor":"middle"});
+    xt.textContent="Quarter";
+
+    // band 10-90
+    let band="M"+px(0)+" "+py(p90[0]);
+    for(let q=1;q<n;q++)band+="L"+px(q)+" "+py(p90[q]);
+    for(let q=n-1;q>=0;q--)band+="L"+px(q)+" "+py(p10[q]);
+    band+="Z";
+    add("path",{d:band,fill:"#B9D2D2","fill-opacity":".55"});
+
+    // target sleeve reference
+    add("line",{x1:G.l,y1:py(p.sleeve*100),x2:G.w-G.r,y2:py(p.sleeve*100),
+      stroke:"var(--cost)","stroke-width":1,"stroke-dasharray":"4 4","stroke-opacity":".55"});
+    const rl=add("text",{x:G.w-G.r,y:py(p.sleeve*100)-5,class:"ax-txt","text-anchor":"end",
+      fill:"var(--cost)"});rl.textContent="target "+(p.sleeve*100).toFixed(0)+"%";
+
+    // median
+    let med="";
+    for(let q=0;q<n;q++)med+=(q?"L":"M")+px(q)+" "+py(p50[q]);
+    add("path",{d:med,fill:"none",stroke:"var(--liq)","stroke-width":2.4});
+    for(let q=0;q<n;q++)add("circle",{cx:px(q),cy:py(p50[q]),r:2.4,fill:"var(--liq)"});
+  }
+
+  // ===== DID YOU KNOW — static rotating facts =====
+  const FACTS=[
+    `The first open-end private-equity vehicle Goldman Sachs launched for individual investors — the <b>G-Series</b> — now spans six evergreen strategies across credit, buyout, infrastructure, real estate, and secondaries, with its European private-credit sleeve alone crossing <em>$8 billion</em> in AUM by early 2026.`,
+    `Evergreen funds must honor redemptions from a liquid sleeve because the underlying private assets can't be sold in days. The industry-standard quarterly redemption cap is <em>5% of NAV per quarter</em> — the same ceiling baked into this model's gating trigger.`,
+    `<b>Cash drag</b> isn't a rounding error. A 10% liquidity sleeve on a fund targeting 12% private-book returns gives up roughly <em>77 basis points a year</em> — the equivalent of almost a full year of T-bill yield over a decade.`,
+    `Goldman's <b>Vintage Strategies</b> secondaries platform has invested over $85 billion across more than 750 secondary transactions since inception. Vintage X, currently being raised, is targeting <em>$15 billion</em> — its largest fund yet.`,
+    `The <b>Level-3 asset valuation problem</b> in evergreen funds is the same reason the 2008 crisis was so hard to price: no active market, so managers use models. MSCI's 2026 private-markets report flagged this as the sector's growing transparency gap as semi-liquid vehicles scale to retail.`,
+    `Private equity has undergone a dramatic structural shift — the number of US-listed public companies has roughly <b>halved</b> since the 1990s, while private-market companies multiplied. Staying private longer means more of a company's compounding growth phase now happens entirely outside public-market portfolios.`,
+    `XIG's <b>Petershill</b> GP-stakes business has been acquiring minority ownership stakes in alternative asset managers since 2007 — one of the longest-running programs of its kind. A GP stake gives the holder a share of management fees and carried interest without the J-curve exposure of investing directly in funds.`,
+    `In a standard semi-liquid fund, net redemptions of just <em>1.5% of NAV per quarter</em> (baseline here) can consume a 10% sleeve within two years if subscriptions dry up — exactly the scenario that forced several non-traded REIT vehicles to gate in 2022–23.`
+  ];
+
+  let factIdx=0;
+  function renderFact(){
+    $("fact-text").innerHTML=FACTS[factIdx];
+    const dots=$("fact-dots"); dots.innerHTML="";
+    FACTS.forEach((_,i)=>{
+      const s=document.createElement("span");
+      if(i===factIdx)s.className="active";
+      s.addEventListener("click",()=>{factIdx=i;renderFact();});
+      dots.appendChild(s);
+    });
+  }
+  $("fact-next").addEventListener("click",()=>{
+    factIdx=(factIdx+1)%FACTS.length; renderFact();
+  });
+  renderFact();
+
+  // ===== ORCHESTRATION =====
+  function render(){
+    const p=readParams();
+    // labels
+    $("v-sleeve").textContent=(p.sleeve*100).toFixed(0)+"%";
+    $("v-redeem").textContent=(p.redeem*100).toFixed(1)+"%";
+    $("v-vol").textContent=(p.vol*100).toFixed(1)+"%";
+    $("v-ill").textContent=(p.ill*100).toFixed(p.ill*100%1?1:0)+"%";
+    $("v-liq").textContent=(p.liq*100).toFixed(1)+"%";
+
+    const stats=simulate(p,3000,false);
+    $("o-drag").textContent=dragBps(p).toFixed(0);
+    $("o-gate").textContent=(stats.gateProb*100).toFixed(1);
+    $("o-lcr").textContent=stats.minLCR>=5?"5.0+":stats.minLCR.toFixed(2);
+    $("o-end").textContent=(stats.endSleeve*100).toFixed(0);
+
+    const fr=buildFrontier(p);
+    buildFan(p);
+  }
+
+  // debounce sliders for smoothness
+  let raf=null;
+  function schedule(){ if(raf)cancelAnimationFrame(raf); raf=requestAnimationFrame(render); }
+  ["s-sleeve","s-redeem","s-vol","s-ill","s-liq"].forEach(id=>{
+    $(id).addEventListener("input",schedule);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
